@@ -7,9 +7,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Deque;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Set;
 
 public class Implementor {
@@ -17,30 +18,29 @@ public class Implementor {
 	final private String outputFileName;
 	private FileWriter out;
 
-	private String className;
-	private Class<?> clazz;
-	private boolean isClass;
-	private String superClassName;
+	final private String className;
+	final private String superClassName;
+	final private Class<?> clazz;
+	final private boolean isClass;
+	final private boolean isInterface;
 
 	public Implementor(String superClassName) throws ImplementorException,
 			ClassNotFoundException {
 		this.clazz = Class.forName(superClassName);
-		setupInterfaceOrClass();
-		this.superClassName = superClassName;
-		this.className = clazz.getSimpleName() + "Impl";
-		this.outputFileName = className + ".java";
-	}
-
-	private void setupInterfaceOrClass() throws ImplementorException {
 		if (isClass(clazz)) {
 			isClass = true;
+			isInterface = false;
 		} else {
 			if (clazz.isInterface()) {
 				isClass = false;
+				isInterface = true;
 			} else {
 				throw new ImplementorException("Not a class or interface\n");
 			}
 		}
+		this.superClassName = superClassName;
+		this.className = clazz.getSimpleName() + "Impl";
+		this.outputFileName = className + ".java";
 	}
 
 	private void writeClass() throws IOException {
@@ -52,51 +52,112 @@ public class Implementor {
 		writeFooter();
 	}
 
-	private String methodToString(Method m) {
-		ArgumentsStrings args = new ArgumentsStrings(m);
-		return m.getReturnType().getSimpleName() + " " + m.getName() + " "
-				+ Arrays.toString(args.types);
+	private Set<Method> getMethods() {
+		Set<Method> methods = new HashSet<Method>();
+		if (isClass) {
+			Deque<Class<?>> Hierarchy = getClassHierarchy(clazz);
+			for (Class<?> superClass : Hierarchy) {
+				Class<?>[] interfaces = superClass.getInterfaces();
+				for (Class<?> interfaze : interfaces) {
+					System.err.println("getMethods : " + interfaze);
+					List<Method> interfaceMethods = extractMethodsFromInterface(interfaze);
+					updateMethods(methods, interfaceMethods);
+				}
+			}
+			for (Class<?> superClass : Hierarchy) {
+				System.err.println("getMethods : " + superClass);
+				List<Method> superMethods = extractMethodsFromClass(superClass);
+				updateMethods(methods, superMethods);
+			}
+		} else {
+			methods.addAll(extractMethodsFromInterface(clazz));
+		}
+		return methods;
 	}
 
-	private List<Method> getMethods() {
-		Set<Class<?>> superClasses = createHierarchy(clazz);
-		Map<String, Method> ms = new HashMap<String, Method>();
-		for (Class<?> c : superClasses) {
-			for (Method m : c.getDeclaredMethods()) {
-				int mod = m.getModifiers();
-				if (Modifier.isAbstract(mod) && !Modifier.isPrivate(mod)) {
-					System.err.println("ADD : " + m);
-					ms.put(methodToString(m), m);
+	private void updateMethods(Collection<Method> methods,
+			Collection<Method> superMethods) {
+		Set<Method> overridedMethods = new HashSet<Method>();
+		for (Method sm : superMethods) {
+			for (Method m : methods) {
+				if (isOverrided(m, sm)) {
+					overridedMethods.add(m);
 				}
 			}
 		}
-		for (Class<?> c : superClasses) {
-			for (Method m : c.getDeclaredMethods()) {
-				int mod = m.getModifiers();
-				Modifier.isFinal(mod);
-				if (!Modifier.isPrivate(mod) && !Modifier.isNative(mod)
-						&& !Modifier.isFinal(mod)) {
-					if (!Modifier.isAbstract(mod)) {
-						System.err.println("REMOVE : " + m);
-						ms.remove(methodToString(m));
-					}
-				}
-			}
-		}
-		return new ArrayList<Method>(ms.values());
+		methods.removeAll(overridedMethods);
+		methods.addAll(superMethods);
 	}
 
-	private Set<Class<?>> createHierarchy(Class<?> clazz) {
-		Set<Class<?>> classes = new HashSet<Class<?>>();
+	private Deque<Class<?>> getClassHierarchy(Class<?> clazz) {
+		Deque<Class<?>> classes = new LinkedList<Class<?>>();
 		Class<?> superClass = clazz;
 		do {
-			classes.add(superClass);
+			classes.addFirst(superClass);
 			superClass = superClass.getSuperclass();
-			for (Class<?> interfaze : clazz.getInterfaces()) {
-				classes.addAll(createHierarchy(interfaze));
-			}
 		} while (superClass != null);
 		return classes;
+	}
+
+	private List<Method> extractMethodsFromClass(Class<?> cls) {
+		if (!isClass(cls)) {
+			throw new NotAClassImplementorError("extractMethodsFromClass", cls);
+		}
+		return extractMethods(cls);
+	}
+
+	private List<Method> extractMethodsFromInterface(Class<?> interfaze) {
+		if (!interfaze.isInterface()) {
+			throw new NotAInterfaceImplementorError(
+					"extractMethodsFromInterface:\n\t", interfaze);
+		}
+		List<Class<?>> interfaces = Arrays.asList(interfaze.getInterfaces());
+		interfaces.add(interfaze);
+		List<Method> methods = new ArrayList<Method>();
+		for (Class<?> i : interfaces) {
+			methods.addAll(extractMethods(i));
+		}
+		return methods;
+	}
+
+	private List<Method> extractMethods(Class<?> clazz) {
+		List<Method> methods = new ArrayList<Method>();
+		for (Method m : clazz.getDeclaredMethods()) {
+			int mod = m.getModifiers();
+			if (Modifier.isAbstract(mod)) {
+				methods.add(m);
+			}
+		}
+		return methods;
+	}
+
+	private boolean isOverrided(Method method, Method other) {
+		String methodName = method.getName();
+		String otherName = other.getName();
+		if (methodName.equals(otherName)) {
+			Class<?>[] parametrs = method.getParameterTypes();
+			Class<?>[] otherParametrs = other.getParameterTypes();
+			if (parametrs.length == otherParametrs.length) {
+				for (int i = 0; i < parametrs.length; i++) {
+					if (parametrs[i] != otherParametrs[i]) {
+						return false;
+					}
+				}
+				Class<?> returnType = method.getReturnType();
+				Class<?> otherReturnType = other.getReturnType();
+				if (returnType.isAssignableFrom(otherReturnType)) {
+					return false;
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@SuppressWarnings("unused")
+	private List<Class<?>> getInterfaces(Class<?> clazz) {
+		// TODO interfaces
+		return null;
 	}
 
 	private void writePackage() throws IOException {
