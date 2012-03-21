@@ -4,6 +4,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -135,20 +136,33 @@ public class Implementor {
 		return interfaces;
 	}
 
+	private enum OverridingType {
+		OVERRIDES, DOESNT_OVERRIDE, DIFFERENT_SIGNATURE
+	}
+
 	private void updateMethods(Set<Method> methods, Set<Method> candidates) {
-		Set<Method> overridedMethods = new HashSet<Method>();
+		List<Method> overridedMethods = new ArrayList<Method>();
+		List<Method> badCandidates = new ArrayList<Method>();
 		for (Method candidate : candidates) {
 			for (Method method : methods) {
-				if (isOverrided(method, candidate)) {
+				OverridingType overridingType = getOverridingType(method,
+						candidate);
+				switch (overridingType) {
+				case OVERRIDES:
 					overridedMethods.add(method);
+					break;
+				case DOESNT_OVERRIDE:
+					badCandidates.add(method);
+					break;
 				}
 			}
 		}
 		methods.removeAll(overridedMethods);
+		candidates.removeAll(badCandidates);
 		methods.addAll(candidates);
 	}
 
-	private boolean isOverrided(Method method, Method other) {
+	private OverridingType getOverridingType(Method method, Method other) {
 		String methodName = method.getName();
 		String otherName = other.getName();
 		if (methodName.equals(otherName)) {
@@ -157,18 +171,18 @@ public class Implementor {
 			if (parametrs.length == otherParametrs.length) {
 				for (int i = 0; i < parametrs.length; i++) {
 					if (parametrs[i] != otherParametrs[i]) {
-						return false;
+						return OverridingType.DIFFERENT_SIGNATURE;
 					}
 				}
 				Class<?> returnType = method.getReturnType();
 				Class<?> otherReturnType = other.getReturnType();
 				if (returnType.isAssignableFrom(otherReturnType)) {
-					return false;
+					return OverridingType.OVERRIDES;
 				}
-				return true;
+				return OverridingType.DOESNT_OVERRIDE;
 			}
 		}
-		return false;
+		return OverridingType.DIFFERENT_SIGNATURE;
 	}
 
 	private Set<Method> extractDeclaredMethods(Class<?> clazz) {
