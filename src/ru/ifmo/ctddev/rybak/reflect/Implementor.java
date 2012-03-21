@@ -22,18 +22,15 @@ public class Implementor {
 	final private String superClassName;
 	final private Class<?> clazz;
 	final private boolean isClass;
-	final private boolean isInterface;
 
 	public Implementor(String superClassName) throws ImplementorException,
 			ClassNotFoundException {
 		this.clazz = Class.forName(superClassName);
 		if (isClass(clazz)) {
 			isClass = true;
-			isInterface = false;
 		} else {
 			if (clazz.isInterface()) {
 				isClass = false;
-				isInterface = true;
 			} else {
 				throw new ImplementorException("Not a class or interface\n");
 			}
@@ -111,9 +108,11 @@ public class Implementor {
 			throw new NotAInterfaceImplementorError(
 					"extractMethodsFromInterface:\n\t", interfaze);
 		}
-		List<Class<?>> interfaces = Arrays.asList(interfaze.getInterfaces());
+		List<Class<?>> interfaces = new ArrayList<Class<?>>(
+				Arrays.asList(interfaze.getInterfaces()));
 		interfaces.add(interfaze);
 		List<Method> methods = new ArrayList<Method>();
+
 		for (Class<?> i : interfaces) {
 			methods.addAll(extractMethods(i));
 		}
@@ -161,7 +160,10 @@ public class Implementor {
 	}
 
 	private void writePackage() throws IOException {
-		out.write("package " + clazz.getPackage().getName() + ";\n\n");
+		Package clazzPackage = clazz.getPackage();
+		if (clazzPackage != null) {
+			out.write("package " + clazzPackage.getName() + ";\n\n");
+		}
 	}
 
 	private void writeHeader() throws IOException {
