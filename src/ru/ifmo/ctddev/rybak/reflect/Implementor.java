@@ -1,14 +1,12 @@
 package ru.ifmo.ctddev.rybak.reflect;
 
-import java.util.List;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Collection;
-import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 public class Implementor {
@@ -38,6 +36,12 @@ public class Implementor {
 		this.outputFileName = className + ".java";
 	}
 
+	private boolean isClass(Class<?> classEntry) {
+		return !classEntry.isAnnotation() && !classEntry.isArray()
+				&& !classEntry.isPrimitive() && !classEntry.isInterface()
+				&& !classEntry.isEnum();
+	}
+
 	private void writeClass() throws IOException {
 		writePackage();
 		writeHeader();
@@ -47,45 +51,60 @@ public class Implementor {
 		writeFooter();
 	}
 
-	private Set<Method> getMethods() {
-		Set<Method> methods = new HashSet<Method>();
+	private void writePackage() throws IOException {
+		Package clazzPackage = clazz.getPackage();
+		if (clazzPackage != null) {
+			out.write("package " + clazzPackage.getName() + ";\n\n");
+		}
+	}
+
+	private void writeHeader() throws IOException {
+		out.write("public class " + className + " " + createExtentionString()
+				+ " {\n");
+	}
+
+	private String createExtentionString() {
 		if (isClass) {
-			Deque<Class<?>> Hierarchy = getClassHierarchy(clazz);
-			for (Class<?> superClass : Hierarchy) {
-				Class<?>[] interfaces = superClass.getInterfaces();
-				for (Class<?> interfaze : interfaces) {
-					System.err.println("getMethods : " + interfaze);
-					Set<Method> interfaceMethods = extractMethodsFromInterface(interfaze);
-					updateMethods(methods, interfaceMethods);
-				}
-			}
-			for (Class<?> superClass : Hierarchy) {
-				System.err.println("getMethods : " + superClass);
-				Set<Method> superMethods = extractMethodsFromClass(superClass);
-				updateMethods(methods, superMethods);
-			}
+			return "extends " + this.superClassName;
 		} else {
-			methods.addAll(extractMethodsFromInterface(clazz));
+			return "implements " + this.superClassName;
+		}
+	}
+
+	private Set<Method> getMethods() {
+		if (isClass) {
+			return extractMethodsFromClass(clazz);
+		} else {
+			return extractMethodsFromInterface(clazz);
+		}
+	}
+
+	private Set<Method> extractMethodsFromClass(Class<?> cls) {
+		if (!isClass(cls)) {
+			throw new NotAClassImplementorError("extractMethodsFromClass2", cls);
+		}
+		Set<Method> methods = new HashSet<Method>();
+		List<Class<?>> classHierarchy = createClassHierarchy(cls);
+		Set<Class<?>> interfaces = new HashSet<Class<?>>();
+		for (Class<?> superClass : classHierarchy) {
+			Class<?>[] superInterfaces = superClass.getInterfaces();
+			for (Class<?> interfaze : superInterfaces) {
+				interfaces.add(interfaze);
+			}
+		}
+		for (Class<?> interfaze : interfaces) {
+			Set<Method> interfaceMethods = extractMethodsFromInterface(interfaze);
+			updateMethods(methods, interfaceMethods);
+		}
+		for (Class<?> superClass : classHierarchy) {
+			Set<Method> superMethods = extractDeclaredMethods(superClass);
+			updateMethods(methods, superMethods);
 		}
 		return methods;
 	}
 
-	private void updateMethods(Collection<Method> methods,
-			Collection<Method> superMethods) {
-		Set<Method> overridedMethods = new HashSet<Method>();
-		for (Method sm : superMethods) {
-			for (Method m : methods) {
-				if (isOverrided(m, sm)) {
-					overridedMethods.add(m);
-				}
-			}
-		}
-		methods.removeAll(overridedMethods);
-		methods.addAll(superMethods);
-	}
-
-	private Deque<Class<?>> getClassHierarchy(Class<?> clazz) {
-		Deque<Class<?>> classes = new LinkedList<Class<?>>();
+	private List<Class<?>> createClassHierarchy(Class<?> clazz) {
+		LinkedList<Class<?>> classes = new LinkedList<Class<?>>();
 		Class<?> superClass = clazz;
 		do {
 			classes.addFirst(superClass);
@@ -94,23 +113,15 @@ public class Implementor {
 		return classes;
 	}
 
-	private Set<Method> extractMethodsFromClass(Class<?> cls) {
-		if (!isClass(cls)) {
-			throw new NotAClassImplementorError("extractMethodsFromClass", cls);
-		}
-		return extractMethods(cls);
-	}
-
 	private Set<Method> extractMethodsFromInterface(Class<?> interfaze) {
 		if (!interfaze.isInterface()) {
 			throw new NotAInterfaceImplementorError(
 					"extractMethodsFromInterface:\n\t", interfaze);
 		}
 		Set<Class<?>> interfaces = getInterfaceHierarchy(interfaze);
-
 		Set<Method> methods = new HashSet<Method>();
 		for (Class<?> i : interfaces) {
-			methods.addAll(extractMethods(i));
+			methods.addAll(extractDeclaredMethods(i));
 		}
 		return methods;
 	}
@@ -124,15 +135,17 @@ public class Implementor {
 		return interfaces;
 	}
 
-	private Set<Method> extractMethods(Class<?> clazz) {
-		Set<Method> methods = new HashSet<Method>();
-		for (Method m : clazz.getDeclaredMethods()) {
-			int mod = m.getModifiers();
-			if (Modifier.isAbstract(mod)) {
-				methods.add(m);
+	private void updateMethods(Set<Method> methods, Set<Method> candidates) {
+		Set<Method> overridedMethods = new HashSet<Method>();
+		for (Method candidate : candidates) {
+			for (Method method : methods) {
+				if (isOverrided(method, candidate)) {
+					overridedMethods.add(method);
+				}
 			}
 		}
-		return methods;
+		methods.removeAll(overridedMethods);
+		methods.addAll(candidates);
 	}
 
 	private boolean isOverrided(Method method, Method other) {
@@ -158,22 +171,15 @@ public class Implementor {
 		return false;
 	}
 
-	@SuppressWarnings("unused")
-	private List<Class<?>> getInterfaces(Class<?> clazz) {
-		// TODO interfaces
-		return null;
-	}
-
-	private void writePackage() throws IOException {
-		Package clazzPackage = clazz.getPackage();
-		if (clazzPackage != null) {
-			out.write("package " + clazzPackage.getName() + ";\n\n");
+	private Set<Method> extractDeclaredMethods(Class<?> clazz) {
+		Set<Method> methods = new HashSet<Method>();
+		for (Method m : clazz.getDeclaredMethods()) {
+			int mod = m.getModifiers();
+			if (Modifier.isAbstract(mod)) {
+				methods.add(m);
+			}
 		}
-	}
-
-	private void writeHeader() throws IOException {
-		out.write("public class " + className + " " + createExtentionString()
-				+ " {\n");
+		return methods;
 	}
 
 	private class ArgumentsStrings {
@@ -214,6 +220,19 @@ public class Implementor {
 		}
 	}
 
+	private void writeMethod(Method method) throws IOException {
+		out.write("\n\t@Override");
+		out.write("\n\t");
+		writeModifiers(method.getModifiers());
+		Class<?> returnType = method.getReturnType();
+		out.write(returnType.getSimpleName() + " " + method.getName());
+		ArgumentsStrings arguments = new ArgumentsStrings(method);
+		writeArguments(arguments);
+		out.write(" {\n");
+		writeReturn(returnType);
+		out.write("\n\t}\n");
+	}
+
 	private void writeModifiers(int mod) throws IOException {
 		if (Modifier.isPublic(mod)) {
 			out.write("public ");
@@ -238,19 +257,6 @@ public class Implementor {
 			}
 		}
 		out.write(")");
-	}
-
-	private void writeMethod(Method m) throws IOException {
-		out.write("\n\t@Override");
-		out.write("\n\t");
-		writeModifiers(m.getModifiers());
-		Class<?> returnType = m.getReturnType();
-		ArgumentsStrings arguments = new ArgumentsStrings(m);
-		out.write(returnType.getSimpleName() + " " + m.getName());
-		writeArguments(arguments);
-		out.write(" {\n");
-		writeReturn(returnType);
-		out.write("\n\t}\n");
 	}
 
 	private void writeReturn(Class<?> returnType) throws IOException {
@@ -278,20 +284,6 @@ public class Implementor {
 
 	private void writeFooter() throws IOException {
 		out.write("\n}");
-	}
-
-	private boolean isClass(Class<?> classEntry) {
-		return !classEntry.isAnnotation() && !classEntry.isArray()
-				&& !classEntry.isPrimitive() && !classEntry.isInterface()
-				&& !classEntry.isEnum();
-	}
-
-	private String createExtentionString() {
-		if (isClass) {
-			return "extends " + this.superClassName;
-		} else {
-			return "implements " + this.superClassName;
-		}
 	}
 
 	public static void main(String[] args) {
