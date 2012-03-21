@@ -5,8 +5,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
@@ -57,13 +55,13 @@ public class Implementor {
 				Class<?>[] interfaces = superClass.getInterfaces();
 				for (Class<?> interfaze : interfaces) {
 					System.err.println("getMethods : " + interfaze);
-					List<Method> interfaceMethods = extractMethodsFromInterface(interfaze);
+					Set<Method> interfaceMethods = extractMethodsFromInterface(interfaze);
 					updateMethods(methods, interfaceMethods);
 				}
 			}
 			for (Class<?> superClass : Hierarchy) {
 				System.err.println("getMethods : " + superClass);
-				List<Method> superMethods = extractMethodsFromClass(superClass);
+				Set<Method> superMethods = extractMethodsFromClass(superClass);
 				updateMethods(methods, superMethods);
 			}
 		} else {
@@ -96,31 +94,38 @@ public class Implementor {
 		return classes;
 	}
 
-	private List<Method> extractMethodsFromClass(Class<?> cls) {
+	private Set<Method> extractMethodsFromClass(Class<?> cls) {
 		if (!isClass(cls)) {
 			throw new NotAClassImplementorError("extractMethodsFromClass", cls);
 		}
 		return extractMethods(cls);
 	}
 
-	private List<Method> extractMethodsFromInterface(Class<?> interfaze) {
+	private Set<Method> extractMethodsFromInterface(Class<?> interfaze) {
 		if (!interfaze.isInterface()) {
 			throw new NotAInterfaceImplementorError(
 					"extractMethodsFromInterface:\n\t", interfaze);
 		}
-		List<Class<?>> interfaces = new ArrayList<Class<?>>(
-				Arrays.asList(interfaze.getInterfaces()));
-		interfaces.add(interfaze);
-		List<Method> methods = new ArrayList<Method>();
+		Set<Class<?>> interfaces = getInterfaceHierarchy(interfaze);
 
+		Set<Method> methods = new HashSet<Method>();
 		for (Class<?> i : interfaces) {
 			methods.addAll(extractMethods(i));
 		}
 		return methods;
 	}
 
-	private List<Method> extractMethods(Class<?> clazz) {
-		List<Method> methods = new ArrayList<Method>();
+	private Set<Class<?>> getInterfaceHierarchy(Class<?> interfaze) {
+		Set<Class<?>> interfaces = new HashSet<Class<?>>();
+		for (Class<?> i : interfaze.getInterfaces()) {
+			interfaces.addAll(getInterfaceHierarchy(i));
+		}
+		interfaces.add(interfaze);
+		return interfaces;
+	}
+
+	private Set<Method> extractMethods(Class<?> clazz) {
+		Set<Method> methods = new HashSet<Method>();
 		for (Method m : clazz.getDeclaredMethods()) {
 			int mod = m.getModifiers();
 			if (Modifier.isAbstract(mod)) {
