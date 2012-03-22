@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,10 +39,10 @@ public class Implementor {
 		this.outputFileName = className + ".java";
 	}
 
-	private boolean isClass(Class<?> classEntry) {
-		return !classEntry.isAnnotation() && !classEntry.isArray()
-				&& !classEntry.isPrimitive() && !classEntry.isInterface()
-				&& !classEntry.isEnum();
+	private boolean isClass(Class<?> clazz) {
+		return !clazz.isAnnotation() && !clazz.isArray()
+				&& !clazz.isPrimitive() && !clazz.isInterface()
+				&& !clazz.isEnum();
 	}
 
 	private void writeClass() throws IOException {
@@ -81,8 +83,12 @@ public class Implementor {
 	}
 
 	private Set<Method> extractMethodsFromClass(Class<?> cls) {
+		/*
+		 * TODO Ask question: What is better? This check or
+		 * "assert isClass(cls) == true" ?
+		 */
 		if (!isClass(cls)) {
-			throw new NotAClassImplementorError("extractMethodsFromClass2", cls);
+			throw new NotAClassImplementorError("extractMethodsFromClass", cls);
 		}
 		Set<Method> methods = new HashSet<Method>();
 		List<Class<?>> classHierarchy = createClassHierarchy(cls);
@@ -98,15 +104,18 @@ public class Implementor {
 			updateMethods(methods, interfaceMethods);
 		}
 		for (Class<?> superClass : classHierarchy) {
-			Set<Method> superMethods = extractDeclaredMethods(superClass);
+			List<Method> superMethods = extractDeclaredMethods(superClass);
 			updateMethods(methods, superMethods);
 		}
 		return methods;
 	}
 
-	private List<Class<?>> createClassHierarchy(Class<?> clazz) {
+	private List<Class<?>> createClassHierarchy(Class<?> cls) {
+		if (!isClass(cls)) {
+			throw new NotAClassImplementorError("createClassHierarchy", cls);
+		}
 		LinkedList<Class<?>> classes = new LinkedList<Class<?>>();
-		Class<?> superClass = clazz;
+		Class<?> superClass = cls;
 		do {
 			classes.addFirst(superClass);
 			superClass = superClass.getSuperclass();
@@ -119,47 +128,35 @@ public class Implementor {
 			throw new NotAInterfaceImplementorError(
 					"extractMethodsFromInterface:\n\t", interfaze);
 		}
-		Set<Class<?>> interfaces = getInterfaceHierarchy(interfaze);
 		Set<Method> methods = new HashSet<Method>();
-		for (Class<?> i : interfaces) {
-			methods.addAll(extractDeclaredMethods(i));
-		}
+		List<Method> candidates = Arrays.asList(interfaze.getMethods());
+		updateMethods(methods, candidates);
 		return methods;
-	}
-
-	private Set<Class<?>> getInterfaceHierarchy(Class<?> interfaze) {
-		Set<Class<?>> interfaces = new HashSet<Class<?>>();
-		for (Class<?> i : interfaze.getInterfaces()) {
-			interfaces.addAll(getInterfaceHierarchy(i));
-		}
-		interfaces.add(interfaze);
-		return interfaces;
 	}
 
 	private enum OverridingType {
 		OVERRIDES, DOESNT_OVERRIDE, DIFFERENT_SIGNATURE
 	}
 
-	private void updateMethods(Set<Method> methods, Set<Method> candidates) {
-		List<Method> overridedMethods = new ArrayList<Method>();
-		List<Method> badCandidates = new ArrayList<Method>();
+	private void updateMethods(Set<Method> methods,
+			Collection<Method> candidates) {
 		for (Method candidate : candidates) {
-			for (Method method : methods) {
-				OverridingType overridingType = getOverridingType(method,
-						candidate);
-				switch (overridingType) {
-				case OVERRIDES:
-					overridedMethods.add(method);
-					break;
-				case DOESNT_OVERRIDE:
-					badCandidates.add(method);
-					break;
-				}
+			updateMethods(methods, candidate);
+		}
+	}
+
+	private void updateMethods(Set<Method> methods, Method candidate) {
+		iterateMethods: for (Method method : methods) {
+			OverridingType overridingType = getOverridingType(method, candidate);
+			switch (overridingType) {
+			case OVERRIDES:
+				methods.remove(method);
+				break iterateMethods;
+			case DOESNT_OVERRIDE:
+				return;
 			}
 		}
-		methods.removeAll(overridedMethods);
-		candidates.removeAll(badCandidates);
-		methods.addAll(candidates);
+		methods.add(candidate);
 	}
 
 	private OverridingType getOverridingType(Method method, Method other) {
@@ -185,8 +182,8 @@ public class Implementor {
 		return OverridingType.DIFFERENT_SIGNATURE;
 	}
 
-	private Set<Method> extractDeclaredMethods(Class<?> clazz) {
-		Set<Method> methods = new HashSet<Method>();
+	private List<Method> extractDeclaredMethods(Class<?> clazz) {
+		List<Method> methods = new ArrayList<Method>();
 		for (Method m : clazz.getDeclaredMethods()) {
 			int mod = m.getModifiers();
 			if (Modifier.isAbstract(mod)) {
