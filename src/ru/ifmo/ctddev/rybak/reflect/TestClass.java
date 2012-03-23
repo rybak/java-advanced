@@ -8,13 +8,12 @@ public class TestClass {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
 		try {
-			Class<?> clazz = Class.forName("SubSubInt");
-			assert clazz.isInterface();
+			Class<?> clazz = Class.forName("ru.ifmo.ctddev.rybak.reflect.test." +
+					"AbstractTestClassSuper");
 			System.out.println(Arrays.toString(clazz.getMethods()));
+			System.out.println(Arrays.toString(clazz.getDeclaredMethods()));
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
 			System.err.println(e.getMessage());
 		}
 	}

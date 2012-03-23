@@ -48,6 +48,7 @@ public class Implementor {
 	private void writeClass() throws IOException {
 		writePackage();
 		writeHeader();
+		/* TODO add constructors processing */
 		for (Method m : getMethods()) {
 			writeMethod(m);
 		}
@@ -76,13 +77,13 @@ public class Implementor {
 
 	private Set<Method> getMethods() {
 		if (isClass) {
-			return extractMethodsFromClass(clazz);
+			return extractAbstractMethodsFromClass(clazz);
 		} else {
 			return extractMethodsFromInterface(clazz);
 		}
 	}
 
-	private Set<Method> extractMethodsFromClass(Class<?> cls) {
+	private Set<Method> extractAbstractMethodsFromClass(Class<?> cls) {
 		/*
 		 * TODO Ask question: What is better? This check or
 		 * "assert isClass(cls) == true" ?
@@ -104,10 +105,28 @@ public class Implementor {
 			updateMethods(methods, interfaceMethods);
 		}
 		for (Class<?> superClass : classHierarchy) {
-			List<Method> superMethods = extractDeclaredMethods(superClass);
-			updateMethods(methods, superMethods);
+			listMethodsContainer superMethods = extractDeclaredMethods(superClass);
+			updateMethods(methods, superMethods.abstractMethods);
+			removeImplementedMethods(methods, superMethods.implementedMethods);
 		}
 		return methods;
+	}
+
+	private void removeImplementedMethods(Set<Method> methods,
+			Collection<Method> implementedMethods) {
+		for (Method candidate : implementedMethods) {
+			iterateMethods: for (Method method : methods) {
+				OverridingType overridingType = getOverridingType(method,
+						candidate);
+				switch (overridingType) {
+				case OVERRIDES:
+					methods.remove(method);
+					break iterateMethods;
+				case DOESNT_OVERRIDE:
+					return;
+				}
+			}
+		}
 	}
 
 	private List<Class<?>> createClassHierarchy(Class<?> cls) {
@@ -182,15 +201,27 @@ public class Implementor {
 		return OverridingType.DIFFERENT_SIGNATURE;
 	}
 
-	private List<Method> extractDeclaredMethods(Class<?> clazz) {
-		List<Method> methods = new ArrayList<Method>();
+	private class listMethodsContainer {
+		public List<Method> abstractMethods, implementedMethods;
+		public listMethodsContainer(List<Method> abstractMethods,
+				List<Method> implementedMethods) {
+			this.abstractMethods = abstractMethods;
+			this.implementedMethods = implementedMethods;
+		}
+	}
+
+	private listMethodsContainer extractDeclaredMethods(Class<?> clazz) {
+		List<Method> abstractMethods = new ArrayList<Method>();
+		List<Method> implementedMethods = new ArrayList<Method>();
 		for (Method m : clazz.getDeclaredMethods()) {
 			int mod = m.getModifiers();
 			if (Modifier.isAbstract(mod)) {
-				methods.add(m);
+				abstractMethods.add(m);
+			} else {
+				implementedMethods.add(m);
 			}
 		}
-		return methods;
+		return new listMethodsContainer(abstractMethods, implementedMethods);
 	}
 
 	private class ArgumentsStrings {
