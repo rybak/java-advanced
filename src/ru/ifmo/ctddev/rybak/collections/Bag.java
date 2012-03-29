@@ -23,7 +23,11 @@ public class Bag<T> extends AbstractCollection<T> {
 		addAll(collection);
 	}
 
-	@Override
+	public void clear() {
+		multiSet.clear();
+		size = 0;
+	}
+
 	public boolean remove(final Object o) {
 		if (!multiSet.containsKey(o)) {
 			return false;
@@ -37,7 +41,6 @@ public class Bag<T> extends AbstractCollection<T> {
 		return true;
 	}
 
-	@Override
 	public boolean removeAll(final Collection<?> c) {
 		boolean isChanged = false;
 		for (final Object o : c) {
@@ -46,12 +49,10 @@ public class Bag<T> extends AbstractCollection<T> {
 		return isChanged;
 	}
 
-	@Override
 	public int size() {
 		return size;
 	}
 
-	@Override
 	public boolean add(final T element) {
 		if (!multiSet.containsKey(element)) {
 			multiSet.put(element, new ArrayList<T>());
@@ -61,12 +62,10 @@ public class Bag<T> extends AbstractCollection<T> {
 		return true;
 	}
 
-	@Override
 	public boolean contains(final Object o) {
 		return multiSet.containsKey(o);
 	}
 
-	@Override
 	public Iterator<T> iterator() {
 		return new BagIterator();
 	}

@@ -4,4 +4,6 @@ public abstract class AbstractTestClass extends AbstractTestClassSuper
 	public abstract Integer a();
 
 	public abstract void b(Integer i);
+	
+	public abstract Integer i();
 }

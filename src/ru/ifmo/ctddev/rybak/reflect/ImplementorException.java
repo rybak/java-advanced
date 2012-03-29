@@ -1,12 +1,14 @@
 package ru.ifmo.ctddev.rybak.reflect;
 
 public class ImplementorException extends Exception {
+	final private static String MESSAGE_HEADER = "Implementor error:\n";
+
 	public ImplementorException() {
 
 	}
 
 	public ImplementorException(String message) {
-		super(message);
+		super(MESSAGE_HEADER + message);
 	}
 
 	public ImplementorException(Exception cause) {
@@ -14,6 +16,6 @@ public class ImplementorException extends Exception {
 	}
 
 	public ImplementorException(String message, Exception cause) {
-		super(message, cause);
+		super(MESSAGE_HEADER + message, cause);
 	}
 }

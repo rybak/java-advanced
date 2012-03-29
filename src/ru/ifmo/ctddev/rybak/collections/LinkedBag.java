@@ -28,12 +28,10 @@ public class LinkedBag<T> extends AbstractCollection<T> {
 		addAll(collection);
 	}
 
-	@Override
 	public int size() {
 		return size;
 	}
 
-	@Override
 	public boolean add(final T element) {
 		if (!multiSet.containsKey(element)) {
 			multiSet.put(element, new HashMap<Integer, Item>());
@@ -55,12 +53,10 @@ public class LinkedBag<T> extends AbstractCollection<T> {
 		return true;
 	}
 
-	@Override
 	public boolean contains(final Object o) {
 		return multiSet.containsKey(o);
 	}
 
-	@Override
 	public Iterator<T> iterator() {
 		return new LinkedBagIterator();
 	}
@@ -74,7 +70,6 @@ public class LinkedBag<T> extends AbstractCollection<T> {
 		return false;
 	}
 
-	@Override
 	public boolean removeAll(final Collection<?> c) {
 		boolean isChanged = false;
 		for (final Object o : c) {
