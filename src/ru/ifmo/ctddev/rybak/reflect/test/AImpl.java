@@ -33,10 +33,6 @@ public class AImpl extends ru.ifmo.ctddev.rybak.reflect.test.A {
 		return 0;
 	}
 
-	public java.util.Set entrySet() {
-		return null;
-	}
-
 	public float readFloat() {
 		return 0;
 	}
@@ -53,16 +49,20 @@ public class AImpl extends ru.ifmo.ctddev.rybak.reflect.test.A {
 
 	}
 
-	public void writeByte(int int0) {
-
-	}
-
 	public long readLong() {
 		return 0;
 	}
 
+	public void writeByte(int int0) {
+
+	}
+
 	public short readShort() {
 		return 0;
+	}
+
+	void a() {
+
 	}
 
 	public void writeShort(int int0) {
@@ -73,7 +73,11 @@ public class AImpl extends ru.ifmo.ctddev.rybak.reflect.test.A {
 
 	}
 
-	public java.lang.String a() {
+	public java.lang.String b() {
+		return null;
+	}
+
+	public java.lang.Class annotationType() {
 		return null;
 	}
 
@@ -93,7 +97,7 @@ public class AImpl extends ru.ifmo.ctddev.rybak.reflect.test.A {
 		return 0;
 	}
 
-	protected java.lang.NullPointerException test(java.awt.List[][][] list0, java.util.List list1, java.lang.OutOfMemoryError... arguments) {
+	protected java.lang.NullPointerException test(java.awt.List[][][] list0, java.util.List list1, java.lang.OutOfMemoryError... arguments2) {
 		return null;
 	}
 

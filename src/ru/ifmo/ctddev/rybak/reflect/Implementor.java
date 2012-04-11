@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Set;
 
 public class Implementor {
+	final private static String DIRECTORY_SEPARATOR = System
+			.getProperty("file.separator");
 	final private static String IO_ERROR_MESSAGE = "An I/O error occurred: ";
 	final private ClassImplExtractor classImplExtractor;
 	private FileWriter out;
@@ -50,8 +52,11 @@ public class Implementor {
 				throw new CannotBeImplementedImplementorException("Final class");
 			}
 			this.className = clazz.getSimpleName() + "Impl";
-			this.outputDirName = "src\\"
-					+ clazz.getPackage().getName().replace(".", "\\") + "\\";
+			this.outputDirName = "src"
+					+ DIRECTORY_SEPARATOR
+					+ clazz.getPackage().getName()
+							.replace(".", DIRECTORY_SEPARATOR)
+					+ DIRECTORY_SEPARATOR;
 			this.outputFileName = className + ".java";
 			if (isClass(clazz)) {
 				isClass = true;
