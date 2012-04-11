@@ -1,5 +1,6 @@
 package ru.ifmo.ctddev.rybak.reflect;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -15,24 +16,24 @@ import java.util.Set;
 
 public class Implementor {
 	final private static String IO_ERROR_MESSAGE = "An I/O error occurred: ";
-	final private ClassExtractor classExtractor;
+	final private ClassImplExtractor classImplExtractor;
 	private FileWriter out;
 
 	public Implementor(String superClassName) throws ClassNotFoundException,
 			ImplementorException {
-		this.classExtractor = new ClassExtractor(superClassName);
+		this.classImplExtractor = new ClassImplExtractor(superClassName);
 	}
 
 	private enum OverridingType {
 		OVERRIDES, DOESNT_OVERRIDE, DIFFERENT_SIGNATURE
 	}
 
-	private class ClassExtractor {
+	private class ClassImplExtractor {
 		final public Collection<Method> methods;
 		final public Collection<Constructor<?>> constructors;
-		// final public Set<Class<?>> imports;
 		final public String extentionString;
 		final public String outputFileName;
+		final public String outputDirName;
 		final public String className;
 		final public String superClassName;
 		final public String packageString;
@@ -40,7 +41,7 @@ public class Implementor {
 		final private Class<?> clazz;
 		final private boolean isClass;
 
-		public ClassExtractor(String superClassName)
+		public ClassImplExtractor(String superClassName)
 				throws ClassNotFoundException,
 				CannotBeImplementedImplementorException {
 			this.superClassName = superClassName;
@@ -49,6 +50,8 @@ public class Implementor {
 				throw new CannotBeImplementedImplementorException("Final class");
 			}
 			this.className = clazz.getSimpleName() + "Impl";
+			this.outputDirName = "src\\"
+					+ clazz.getPackage().getName().replace(".", "\\") + "\\";
 			this.outputFileName = className + ".java";
 			if (isClass(clazz)) {
 				isClass = true;
@@ -64,37 +67,7 @@ public class Implementor {
 			this.extentionString = createExtentionString();
 			this.constructors = extractConstructors();
 			this.methods = new MethodsExtractor().extractMethods();
-			System.err.println("TO REALIZE:");
-			for (Method m : methods) {
-				System.err.println(m.toString());
-			}
-			// this.imports = extractImports();
-		}
 
-		@SuppressWarnings("unused")
-		private Set<Class<?>> extractImports() {
-			Set<Class<?>> packages = new HashSet<Class<?>>();
-			for (Constructor<?> constructor : this.constructors) {
-				packages.addAll(extractImportsFromParameters(constructor
-						.getParameterTypes()));
-			}
-			for (Method method : methods) {
-				packages.addAll(extractImportsFromParameters(method
-						.getParameterTypes()));
-			}
-			return packages;
-		}
-
-		private Collection<? extends Class<?>> extractImportsFromParameters(
-				Class<?>[] parameterTypes) {
-			Set<Class<?>> packages = new HashSet<Class<?>>();
-			for (Class<?> arg : parameterTypes) {
-				if (arg.isArray()) {
-					arg = arg.getComponentType();
-				}
-				packages.add(arg);
-			}
-			return packages;
 		}
 
 		private String createPackageString() {
@@ -117,7 +90,6 @@ public class Implementor {
 			return !clazz.isAnnotation() && !clazz.isArray()
 					&& !clazz.isPrimitive() && !clazz.isInterface()
 					&& !clazz.isEnum();
-			// && !clazz.equals(Class.forName("java.lang.Enum"));
 		}
 
 		private Collection<Constructor<?>> extractConstructors()
@@ -154,8 +126,6 @@ public class Implementor {
 
 			private Set<Method> extractAbstractMethodsFromClass(Class<?> cls)
 					throws CannotBeImplementedImplementorException {
-				// if (!isClass(cls)) { throw new
-				// NotAClassImplementorError("extractMethodsFromClass", cls);}
 				assert isClass(cls);
 				List<Class<?>> classHierarchy = createClassHierarchy(cls);
 				Set<Class<?>> interfaces = extractInterfacesFromClassHierarchy(classHierarchy);
@@ -174,8 +144,6 @@ public class Implementor {
 			}
 
 			private List<Class<?>> createClassHierarchy(Class<?> cls) {
-				// if (!isClass(cls)) {throw new
-				// NotAClassImplementorError("createClassHierarchy",cls);}
 				assert isClass(cls);
 				LinkedList<Class<?>> classes = new LinkedList<Class<?>>();
 				Class<?> superClass = cls;
@@ -200,9 +168,6 @@ public class Implementor {
 
 			private Set<Method> extractMethodsFromInterface(Class<?> interfaze)
 					throws CannotBeImplementedImplementorException {
-				// if (!interfaze.isInterface()) {throw new
-				// NotAnInterfaceImplementorError("extractMethodsFromInterface:\n\t",
-				// interfaze);}
 				assert interfaze.isInterface();
 				Set<Method> methods = new HashSet<Method>();
 				List<Method> candidates = Arrays.asList(interfaze.getMethods());
@@ -281,13 +246,10 @@ public class Implementor {
 				for (Method method : clazz.getDeclaredMethods()) {
 					int mod = method.getModifiers();
 					if (Modifier.isAbstract(mod)) {
-						System.err.print("a|");
 						abstractMethods.add(method);
 					} else {
-						System.err.print("r|");
 						implementedMethods.add(method);
 					}
-					System.err.println(method.toString());
 				}
 				return new ListMethodsContainer(abstractMethods,
 						implementedMethods);
@@ -314,11 +276,11 @@ public class Implementor {
 
 	}
 
-	private class ClassWriter {
+	private class ClassImplWriter {
 		final private FileWriter out;
-		final private ClassExtractor classExtractor;
+		final private ClassImplExtractor classExtractor;
 
-		public ClassWriter(FileWriter out, ClassExtractor classExtractor) {
+		public ClassImplWriter(FileWriter out, ClassImplExtractor classExtractor) {
 			this.out = out;
 			this.classExtractor = classExtractor;
 		}
@@ -327,16 +289,13 @@ public class Implementor {
 			out.write(classExtractor.packageString + "\n");
 			writeHeader();
 			writeConstructors();
-			for (Method m : classExtractor.methods) {
-				writeMethod(m);
+			for (Method method : classExtractor.methods) {
+				writeMethod(method);
 			}
 			writeFooter();
 		}
 
 		private void writeHeader() throws IOException {
-			// for (Class<?> clazz : classExtractor.imports) {
-			// out.write("import " + clazz.getName() + ";\n");
-			// }
 			out.write("public class " + classExtractor.className + " "
 					+ classExtractor.extentionString + " {\n");
 		}
@@ -525,10 +484,12 @@ public class Implementor {
 
 	private void run() {
 		try {
-			out = new FileWriter(classExtractor.outputFileName);
+			File file = new File(classImplExtractor.outputDirName
+					+ classImplExtractor.outputFileName);
+			out = new FileWriter(file);
 			try {
-				ClassWriter classWriter = new ClassWriter(out,
-						this.classExtractor);
+				ClassImplWriter classWriter = new ClassImplWriter(out,
+						this.classImplExtractor);
 				classWriter.writeClass();
 			} finally {
 				out.close();
@@ -536,6 +497,5 @@ public class Implementor {
 		} catch (IOException e) {
 			System.err.println(IO_ERROR_MESSAGE + e.getMessage());
 		}
-
 	}
 }
