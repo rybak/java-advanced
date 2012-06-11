@@ -49,12 +49,12 @@ public class AImpl extends ru.ifmo.ctddev.rybak.reflect.test.A {
 
 	}
 
-	public long readLong() {
-		return 0;
-	}
-
 	public void writeByte(int int0) {
 
+	}
+
+	public long readLong() {
+		return 0;
 	}
 
 	public short readShort() {
@@ -81,11 +81,11 @@ public class AImpl extends ru.ifmo.ctddev.rybak.reflect.test.A {
 		return null;
 	}
 
-	public int readUnsignedShort() {
+	public char readChar() {
 		return 0;
 	}
 
-	public char readChar() {
+	public int readUnsignedShort() {
 		return 0;
 	}
 
